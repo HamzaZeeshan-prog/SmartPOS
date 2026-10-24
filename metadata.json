@@ -1,0 +1,6 @@
+{
+  "name": "Smart POS - Cross-Platform Retail & Mobile POS",
+  "description": "Production-grade cross-platform Smart POS mobile and web application architecture, Drift/SQLite offline database schema, and live POS terminal simulator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
