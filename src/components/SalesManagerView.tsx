@@ -197,8 +197,88 @@ export const SalesManagerView: React.FC<SalesManagerViewProps> = ({
           </div>
         </div>
 
-        {/* Sales Table */}
-        <div className="overflow-x-auto rounded-xl border border-slate-800">
+        {/* Mobile View: Transaction Cards (<md) */}
+        <div className="md:hidden space-y-3">
+          {filteredSales.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 text-xs">
+              No transactions match the selected filters.
+            </div>
+          ) : (
+            filteredSales.map((s) => {
+              const isRefunded = s.isRefunded;
+              const isPartial = s.isPartiallyRefunded;
+
+              return (
+                <div
+                  key={s.id}
+                  className={`p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3 ${
+                    isRefunded ? 'bg-rose-950/10 border-rose-900/30' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-mono font-bold text-blue-400 text-xs">{s.invoiceNumber}</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {new Date(s.createdAt).toLocaleDateString()} · {new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`font-mono font-bold text-sm ${isRefunded ? 'line-through text-slate-500' : 'text-emerald-400'}`}>
+                        {activeShop.currency} {s.grandTotal.toLocaleString()}
+                      </div>
+                      <span className="text-[10px] uppercase font-semibold text-slate-400">
+                        {s.payments[0]?.method.replace('_', ' ') || 'Paid'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <div>
+                      <span className="text-slate-400">Customer: </span>
+                      <span className="text-white font-medium">{s.customerName || 'Walk-in Customer'}</span>
+                    </div>
+                    <div className="text-slate-400 text-[11px]">
+                      {s.items.reduce((sum, item) => sum + item.quantity, 0)} units · {s.cashierName}
+                    </div>
+                  </div>
+
+                  {isRefunded && (
+                    <div className="text-[11px] text-rose-400 font-bold flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Fully Refunded
+                    </div>
+                  )}
+                  {isPartial && (
+                    <div className="text-[11px] text-amber-400 font-bold flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Partially Refunded (-{activeShop.currency} {s.refundAmount})
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button
+                      onClick={() => onOpenReceipt(s)}
+                      className="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors min-h-[44px]"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                      View / Print Slip
+                    </button>
+
+                    <button
+                      onClick={() => onOpenRefund(s)}
+                      disabled={isRefunded}
+                      className="py-2 px-3 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 disabled:opacity-30 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors min-h-[44px]"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-rose-400" />
+                      Refund
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Table (>=md) */}
+        <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-800">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-950 text-slate-400 font-mono border-b border-slate-800">
@@ -276,9 +356,9 @@ export const SalesManagerView: React.FC<SalesManagerViewProps> = ({
                       </td>
 
                       <td className="py-3.5 px-3 text-center">
-                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                        <span className="text-[11px] font-sans font-medium text-slate-300 uppercase">
                           {s.payments[0]?.method.replace('_', ' ') || 'Paid'}
-                        </div>
+                        </span>
                       </td>
 
                       <td className="py-3.5 px-3 text-right">

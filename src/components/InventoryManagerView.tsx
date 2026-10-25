@@ -213,8 +213,79 @@ export const InventoryManagerView: React.FC<InventoryManagerViewProps> = ({
         ))}
       </div>
 
-      {/* Products Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      {/* Products Catalog: Mobile Cards (<md) */}
+      <div className="md:hidden space-y-3">
+        {filteredProducts.map((p) => {
+          const isLow = p.stockQuantity <= p.minimumStockLimit;
+          const margin = Math.round(((p.sellingPrice - p.costPrice) / (p.sellingPrice || 1)) * 100);
+
+          return (
+            <div
+              key={p.id}
+              className={`p-4 bg-slate-900 border rounded-2xl space-y-3 ${
+                isLow ? 'border-amber-500/40 bg-amber-950/10' : 'border-slate-800'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="font-bold text-white text-sm">{p.name}</h4>
+                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    {p.barcode} · {p.category} · {p.brand}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono font-bold text-emerald-400 text-sm">
+                    {activeShop.currency} {p.sellingPrice}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    Cost: {activeShop.currency} {p.costPrice} ({margin}% margin)
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span className="text-[11px] text-slate-400 font-normal">Stock:</span>
+                  <span className={isLow ? 'text-amber-400' : 'text-white'}>
+                    {p.stockQuantity} {p.unit}
+                  </span>
+                  {isLow && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Low
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onOpenStockAdjustment(p)}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-300 rounded-lg text-xs font-semibold transition-colors min-h-[36px]"
+                  >
+                    Adjust Stock
+                  </button>
+                  <button
+                    onClick={() => onOpenEditProduct(p)}
+                    className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+                    aria-label="Edit"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteProduct(p.id)}
+                    className="p-2 hover:bg-slate-800 text-slate-500 hover:text-red-400 rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Products Table: Desktop (>=md) */}
+      <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>

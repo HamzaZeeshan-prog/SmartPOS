@@ -121,11 +121,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     onPaymentSuccess([payment], invoiceNumber);
   };
 
+  const [creditError, setCreditError] = useState<string | null>(null);
+
   const handleCompleteCustomerCredit = () => {
     if (!customer) {
-      alert('Please select a customer to charge to store credit account.');
+      setCreditError('Please attach a customer to charge to a store credit (Khata) account.');
       return;
     }
+    setCreditError(null);
     const payment: PaymentRecord = {
       id: `pay_${Date.now()}`,
       method: 'customer_credit',
@@ -160,124 +163,128 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="p-4.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
           <div>
-            <span className="text-xs font-mono text-blue-400 font-semibold">{invoiceNumber}</span>
-            <h2 className="text-xl font-bold text-white">POS Checkout & Payment</h2>
+            <span className="text-[11px] font-mono text-blue-400 font-semibold">{invoiceNumber}</span>
+            <h2 className="text-lg sm:text-xl font-bold text-white">POS Checkout & Payment</h2>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors min-h-[44px] min-w-[44px]"
+            aria-label="Close Checkout"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Bill Summary Banner */}
-        <div className="bg-blue-950/40 border-b border-blue-900/40 p-3.5 px-6 flex items-center justify-between">
+        <div className="bg-blue-950/40 border-b border-blue-900/40 p-3 sm:p-3.5 px-4 sm:px-6 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400">Total Payable Amount</div>
-            <div className="text-2xl font-bold text-white font-mono">
+            <div className="text-[11px] text-slate-400">Total Payable Amount</div>
+            <div className="text-xl sm:text-2xl font-bold text-white font-mono">
               {shop.currency} {grandTotal.toLocaleString()}
             </div>
           </div>
           {customer ? (
             <div className="text-right">
-              <div className="text-xs text-slate-400">Attached Customer</div>
+              <div className="text-[11px] text-slate-400">Attached Customer</div>
               <div className="text-sm font-semibold text-blue-300">{customer.name}</div>
-              <div className="text-xs text-slate-500 font-mono">Due: PKR {customer.dueBalance}</div>
+              <div className="text-[11px] text-slate-400 font-mono">Current Due: PKR {customer.dueBalance.toLocaleString()}</div>
             </div>
           ) : (
-            <div className="text-right text-xs text-slate-500 italic">
+            <div className="text-right text-xs text-slate-400">
               Walk-in Customer
             </div>
           )}
         </div>
 
         {/* Payment Method Selector Tabs */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 p-3 bg-slate-950/60 border-b border-slate-800">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2 p-2.5 sm:p-3 bg-slate-950/60 border-b border-slate-800">
           <button
-            onClick={() => setSelectedMethod('cash')}
-            className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
+            onClick={() => { setSelectedMethod('cash'); setCreditError(null); }}
+            className={`p-2 sm:p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
               selectedMethod === 'cash'
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                 : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <Banknote className="w-4 h-4" />
-            Cash
+            <span>Cash</span>
           </button>
 
           <button
             onClick={() => {
               setSelectedMethod('jazzcash');
               setDigitalProvider('jazzcash');
+              setCreditError(null);
             }}
-            className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
               selectedMethod === 'jazzcash'
                 ? 'bg-red-600 text-white shadow-lg shadow-red-600/30'
                 : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <Smartphone className="w-4 h-4 text-red-400" />
-            JazzCash
+            <span>JazzCash</span>
           </button>
 
           <button
             onClick={() => {
               setSelectedMethod('easypaisa');
               setDigitalProvider('easypaisa');
+              setCreditError(null);
             }}
-            className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
               selectedMethod === 'easypaisa'
                 ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
                 : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <Smartphone className="w-4 h-4 text-emerald-400" />
-            Easypaisa
+            <span>Easypaisa</span>
           </button>
 
           <button
             onClick={() => {
               setSelectedMethod('bank_qr');
               setDigitalProvider('bank_qr');
+              setCreditError(null);
             }}
-            className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
               selectedMethod === 'bank_qr'
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                 : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <QrCode className="w-4 h-4 text-indigo-400" />
-            Bank QR
+            <span>Raast QR</span>
           </button>
 
           <button
-            onClick={() => setSelectedMethod('card')}
-            className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
+            onClick={() => { setSelectedMethod('card'); setCreditError(null); }}
+            className={`p-2 sm:p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
               selectedMethod === 'card'
                 ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30'
                 : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <CreditCard className="w-4 h-4 text-cyan-400" />
-            Card POS
+            <span>Card POS</span>
           </button>
 
           <button
-            onClick={() => setSelectedMethod('split')}
-            className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
-              selectedMethod === 'split'
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
+            onClick={() => { setSelectedMethod('customer_credit'); setCreditError(null); }}
+            className={`p-2 sm:p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
+              selectedMethod === 'customer_credit'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
                 : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'
             }`}
           >
-            <Split className="w-4 h-4 text-amber-400" />
-            Split Pay
+            <UserCheck className="w-4 h-4 text-purple-400" />
+            <span>Udhaar</span>
           </button>
         </div>
 
@@ -506,10 +513,75 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <button
                 onClick={handleCompleteSplitPayment}
                 disabled={!isSplitValid}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer min-h-[44px]"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 Complete Split Payment & Print Slip
+              </button>
+            </div>
+          )}
+
+          {/* 5. CUSTOMER CREDIT (UDHAAR) MODE */}
+          {selectedMethod === 'customer_credit' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-purple-950/30 border border-purple-800/40 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-purple-300 font-bold text-sm">
+                  <UserCheck className="w-4 h-4 text-purple-400" />
+                  Store Credit & "Khata" Ledger Charge
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Charge this entire invoice to the customer's credit ledger. The amount will be added to their outstanding due balance and logged in their statement.
+                </p>
+              </div>
+
+              {creditError && (
+                <div className="p-3 bg-rose-950/40 border border-rose-800/50 rounded-xl flex items-center gap-2 text-xs text-rose-300">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{creditError}</span>
+                </div>
+              )}
+
+              {customer ? (
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Account Name:</span>
+                    <span className="font-bold text-white text-sm">{customer.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Phone Number:</span>
+                    <span className="font-mono text-slate-300">{customer.phone}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Current Outstanding Due:</span>
+                    <span className="font-mono font-bold text-rose-400">
+                      {shop.currency} {customer.dueBalance.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-800 font-bold">
+                    <span className="text-slate-300">New Due Balance After This Sale:</span>
+                    <span className="font-mono text-purple-300 text-sm">
+                      {shop.currency} {(customer.dueBalance + grandTotal).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-center space-y-2">
+                  <div className="text-xs text-slate-400">
+                    No customer is currently linked to this checkout session.
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Please close this modal and click <strong>"Customer"</strong> on the POS Terminal to link an existing customer or register a new one.
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={handleCompleteCustomerCredit}
+                disabled={!customer}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition-all cursor-pointer min-h-[44px]"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Authorize Udhaar & Print Receipt
               </button>
             </div>
           )}

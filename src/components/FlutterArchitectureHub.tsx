@@ -20,8 +20,11 @@ import {
   Sparkles,
   Database,
   Cpu,
-  CheckCircle2
+  CheckCircle2,
+  Download,
+  Check
 } from 'lucide-react';
+import { downloadFlutterProjectZip } from '../services/flutterExportService';
 
 interface PhaseMeta {
   id: number;
@@ -101,6 +104,21 @@ const PHASES: PhaseMeta[] = [
 
 export const FlutterArchitectureHub: React.FC = () => {
   const [activePhase, setActivePhase] = useState<number>(8);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+
+  const handleDownloadZip = async () => {
+    setIsDownloading(true);
+    try {
+      await downloadFlutterProjectZip();
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const currentMeta = PHASES.find((p) => p.id === activePhase) || PHASES[7];
 
@@ -129,11 +147,26 @@ export const FlutterArchitectureHub: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800/80 px-4 py-2.5 rounded-xl">
-            <Database className="w-4 h-4 text-emerald-400" />
-            <div className="text-left text-xs">
-              <div className="font-semibold text-white">Offline-First Engine</div>
-              <div className="text-[11px] text-slate-400">Drift SQLite ↔ Cloud Firestore</div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={handleDownloadZip}
+              disabled={isDownloading}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer min-h-[44px]"
+            >
+              {downloadSuccess ? (
+                <Check className="w-4 h-4 text-emerald-300" />
+              ) : (
+                <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
+              )}
+              <span>{downloadSuccess ? 'Downloaded!' : isDownloading ? 'Packaging...' : 'Download Project (.zip)'}</span>
+            </button>
+
+            <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800/80 px-4 py-2 rounded-xl min-h-[44px]">
+              <Database className="w-4 h-4 text-emerald-400" />
+              <div className="text-left text-xs">
+                <div className="font-semibold text-white">Offline-First Engine</div>
+                <div className="text-[11px] text-slate-400">Drift SQLite ↔ Firestore</div>
+              </div>
             </div>
           </div>
         </div>

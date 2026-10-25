@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FlutterMobileFrame } from './components/FlutterMobileFrame';
 import { InteractiveLogo } from './components/InteractiveLogo';
 import { FlutterArchitectureHub } from './components/FlutterArchitectureHub';
 import { DashboardView } from './components/DashboardView';
@@ -511,8 +512,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-500 selection:text-white">
-      {/* Toast Notification */}
+    <FlutterMobileFrame onOpenCodeHub={() => setCurrentView('architecture')}>
+      <div className="w-full min-h-full flex-1 flex flex-col bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white relative">
+        {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold animate-bounce border border-emerald-400">
           <CheckCircle2 className="w-4 h-4 text-emerald-200" />
@@ -972,7 +974,7 @@ export default function App() {
                       setCurrentView(item.id as any);
                       setIsMobileDrawerOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[40px] ${
+                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                         : 'text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -1163,6 +1165,7 @@ export default function App() {
           await handleSyncAllToCloud();
         }}
       />
-    </div>
+      </div>
+    </FlutterMobileFrame>
   );
 }

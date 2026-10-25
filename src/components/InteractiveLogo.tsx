@@ -51,8 +51,8 @@ export const InteractiveLogo: React.FC<InteractiveLogoProps> = ({
       osc.frequency.setValueAtTime(1760, audioCtx.currentTime); // High pitch supermarket scanner tone
       osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.08);
 
-      gain.setValueAtTime(0.18, audioCtx.currentTime);
-      gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
 
       osc.connect(gain);
       gain.connect(audioCtx.destination);
