@@ -1,18 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Sale, Expense, Product, Shop, User } from '../types/pos';
+import { getShopEntitlements } from '../data/saasConfig';
 import { 
   TrendingUp, 
-  TrendingDown, 
   DollarSign, 
   PieChart, 
   Lock, 
-  ShieldAlert, 
-  Download, 
-  Calendar, 
   Award, 
   Package, 
-  Sparkles,
-  BarChart3
+  BarChart3,
+  Crown
 } from 'lucide-react';
 
 interface ProfitLossViewProps {
@@ -21,16 +18,45 @@ interface ProfitLossViewProps {
   products: Product[];
   shop: Shop;
   currentUser: User;
+  onOpenUpgrade?: () => void;
 }
 
 export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
   sales,
   expenses,
-  products,
   shop,
   currentUser,
+  onOpenUpgrade,
 }) => {
-  const [dateFilter, setDateFilter] = useState<'today' | 'month' | 'all'>('all');
+  const entitlements = getShopEntitlements(shop);
+
+  // Plan Guard: Starter Monthly disables P&L & Margins analytics
+  if (!entitlements.allowProfitLoss) {
+    return (
+      <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-4 shadow-xl">
+        <div className="w-16 h-16 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mx-auto">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold">
+          <Crown className="w-3.5 h-3.5" />
+          Business Pro Monthly Feature
+        </div>
+        <h3 className="text-xl font-bold text-white">P&L & Margin Analytics Disabled on Starter Monthly</h3>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          Your business <strong className="text-white">{shop.name}</strong> is subscribed to <strong>{entitlements.planName}</strong>. Profit & Loss statements, COGS breakdowns, multi-branch expansion, custom cashiers/managers, expiry alerts, and Cloud Sync require <strong>Business Pro Monthly</strong>.
+        </p>
+        {onOpenUpgrade && currentUser.role === 'owner' && (
+          <button
+            type="button"
+            onClick={onOpenUpgrade}
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 cursor-pointer"
+          >
+            Upgrade to Business Pro (PKR 4,900/mo)
+          </button>
+        )}
+      </div>
+    );
+  }
 
   // RBAC Guard: Cashiers cannot view profit margins
   if (currentUser.role === 'cashier') {
@@ -46,9 +72,6 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
         <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400 font-mono">
           Current Role: <span className="text-amber-400 font-bold uppercase">{currentUser.role}</span> ({currentUser.name})
         </div>
-        <p className="text-[11px] text-slate-500">
-          Tip: Use the role switcher in the top right header to sign in as <strong>Tariq Mehmood (Owner)</strong> to inspect this statement.
-        </p>
       </div>
     );
   }

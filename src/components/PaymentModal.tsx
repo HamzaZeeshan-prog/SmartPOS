@@ -48,6 +48,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // Digital provider selection
   const [digitalProvider, setDigitalProvider] = useState<'jazzcash' | 'easypaisa' | 'bank_qr'>('jazzcash');
   const [qrTimerSeconds, setQrTimerSeconds] = useState(300);
+  const [creditError, setCreditError] = useState<string | null>(null);
 
   const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
   const paymentReference = `REF-${Math.floor(10000000 + Math.random() * 90000000)}`;
@@ -120,8 +121,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     };
     onPaymentSuccess([payment], invoiceNumber);
   };
-
-  const [creditError, setCreditError] = useState<string | null>(null);
 
   const handleCompleteCustomerCredit = () => {
     if (!customer) {

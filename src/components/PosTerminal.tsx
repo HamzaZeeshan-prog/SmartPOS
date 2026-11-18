@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Product, CartItem, Customer, Shop, User } from '../types/pos';
+import { findProductByBarcode } from '../utils/barcodeUtils';
 import { 
   Search, 
   Barcode, 
@@ -10,15 +11,13 @@ import {
   PauseCircle, 
   PlayCircle, 
   CreditCard, 
-  Tag, 
   AlertTriangle, 
   ChevronDown, 
   ShoppingBag, 
   FileEdit, 
-  Truck, 
   CheckCircle2, 
-  DollarSign,
-  ShoppingCart
+  ShoppingCart,
+  X
 } from 'lucide-react';
 
 interface PosTerminalProps {
@@ -26,7 +25,9 @@ interface PosTerminalProps {
   customers: Customer[];
   activeShop: Shop;
   currentUser: User;
+  scannedProductSignal?: { product: Product; seq: number } | null;
   onOpenScanner: () => void;
+  onAddCustomer?: (customer: Omit<Customer, 'id'>) => Customer | void;
   onStartCheckout: (
     cart: CartItem[], 
     subtotal: number, 
@@ -41,26 +42,53 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   products,
   customers,
   activeShop,
-  currentUser,
+  currentUser: _currentUser,
+  scannedProductSignal,
   onOpenScanner,
+  onAddCustomer,
   onStartCheckout,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [quickAddCustOpen, setQuickAddCustOpen] = useState(false);
+  const [quickCustName, setQuickCustName] = useState('');
+  const [quickCustPhone, setQuickCustPhone] = useState('+92 3');
   const [terminalNotice, setTerminalNotice] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
   const [mobileActiveTab, setMobileActiveTab] = useState<'catalog' | 'cart'>('catalog');
   
-  // Cart-level financial adjustments
-  const [billDiscountType, setBillDiscountType] = useState<'percent' | 'fixed'>('fixed');
-  const [billDiscountValue, setBillDiscountValue] = useState<number>(0);
+  // Cart-level financial adjustments (Discount optional toggle like GST)
+  const [billDiscountEnabled, setBillDiscountEnabled] = useState<boolean>(activeShop.discountEnabled ?? false);
+  const [billDiscountType, setBillDiscountType] = useState<'percent' | 'fixed'>(activeShop.discountEnabled ? 'percent' : 'fixed');
+  const [billDiscountValue, setBillDiscountValue] = useState<number>(activeShop.discountEnabled ? (activeShop.defaultDiscountRate ?? 0) : 0);
   const [taxEnabled, setTaxEnabled] = useState<boolean>(activeShop.taxEnabled);
   const [deliveryCharge, setDeliveryCharge] = useState<number>(0);
+
+  // Scanned Barcode Quick Quantity Prompt
+  const [qtyPromptProduct, setQtyPromptProduct] = useState<Product | null>(null);
+  const [qtyPromptValue, setQtyPromptValue] = useState<number>(1);
 
   // Item note modal or active note editing
   const [editingNoteItemId, setEditingNoteItemId] = useState<string | null>(null);
   const [itemNoteText, setItemNoteText] = useState('');
+
+  React.useEffect(() => {
+    setTaxEnabled(activeShop.taxEnabled);
+    const discOn = activeShop.discountEnabled ?? false;
+    setBillDiscountEnabled(discOn);
+    setBillDiscountType(discOn ? 'percent' : 'fixed');
+    setBillDiscountValue(discOn ? (activeShop.defaultDiscountRate ?? 0) : 0);
+  }, [activeShop.id, activeShop.taxEnabled, activeShop.discountEnabled, activeShop.defaultDiscountRate]);
+
+  React.useEffect(() => {
+    if (scannedProductSignal?.product) {
+      setQtyPromptProduct(scannedProductSignal.product);
+      setQtyPromptValue(1);
+    }
+  }, [scannedProductSignal]);
 
   // Held sales stack
   const [heldSales, setHeldSales] = useState<{ id: string; customerId?: string; items: CartItem[]; time: string }[]>([]);
@@ -71,6 +99,16 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const showTerminalNotice = (message: string, type: 'warning' | 'error' | 'info' = 'warning') => {
     setTerminalNotice({ message, type });
     setTimeout(() => setTerminalNotice(null), 3500);
+  };
+
+  const getDaysUntilExpiry = (expiryDate?: string): number | null => {
+    if (!expiryDate || !expiryDate.trim()) return null;
+    const exp = new Date(expiryDate);
+    if (Number.isNaN(exp.getTime())) return null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(exp.getFullYear(), exp.getMonth(), exp.getDate());
+    return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   // Filter products
@@ -86,20 +124,21 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   });
 
   // Cart operations
-  const addToCart = (product: Product) => {
-    // Validate stock limit if store does not allow negative stock
+  const addToCart = (product: Product, addQty = 1) => {
+    const safeAdd = Math.max(1, Math.floor(addQty));
     const existing = cart.find((item) => item.product.id === product.id);
     const existingQty = existing ? existing.quantity : 0;
 
-    if (!activeShop.allowNegativeStock && existingQty + 1 > product.stockQuantity) {
+    if (!activeShop.allowNegativeStock && existingQty + safeAdd > product.stockQuantity) {
       showTerminalNotice(`Warning: Stock limit reached for ${product.name} (Max: ${product.stockQuantity})`, 'warning');
+      if (product.stockQuantity <= existingQty) return;
     }
 
     setCart((prev) => {
       if (existing) {
         return prev.map((item) =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + safeAdd }
             : item
         );
       }
@@ -108,7 +147,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
         {
           id: `item_${Date.now()}_${product.id}`,
           product,
-          quantity: 1,
+          quantity: safeAdd,
           unitPrice: product.sellingPrice,
           itemDiscount: 0,
           itemTaxRate: product.taxPercentage,
@@ -195,10 +234,11 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const rawSubtotal = cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const itemsDiscountSum = cart.reduce((sum, item) => sum + item.itemDiscount, 0);
   
-  const billDiscount = 
-    billDiscountType === 'percent'
+  const billDiscount = billDiscountEnabled
+    ? billDiscountType === 'percent'
       ? (rawSubtotal * Math.min(100, Math.max(0, billDiscountValue))) / 100
-      : Math.min(rawSubtotal, Math.max(0, billDiscountValue));
+      : Math.min(rawSubtotal, Math.max(0, billDiscountValue))
+    : 0;
 
   const totalDiscount = itemsDiscountSum + billDiscount;
   const taxableSubtotal = Math.max(0, rawSubtotal - totalDiscount);
@@ -302,9 +342,20 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search products by name, barcode, brand..."
+              placeholder="Search products or press Enter on barcode..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchQuery.trim()) {
+                  const exactMatch = findProductByBarcode(products, searchQuery);
+                  if (exactMatch) {
+                    e.preventDefault();
+                    setSearchQuery('');
+                    setQtyPromptProduct(exactMatch);
+                    setQtyPromptValue(1);
+                  }
+                }
+              }}
               className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -400,6 +451,17 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                   <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
                     {p.barcode}
                   </div>
+                  {(() => {
+                    const days = getDaysUntilExpiry(p.expiryDate);
+                    if (days === null || days > 30) return null;
+                    return (
+                      <div className={`text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded inline-block ${
+                        days < 0 ? 'bg-rose-500/20 text-rose-300' : 'bg-orange-500/20 text-orange-300'
+                      }`}>
+                        {days < 0 ? 'EXPIRED' : days === 0 ? 'Exp TODAY' : `Exp ${days}d`}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
@@ -451,21 +513,183 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
           </div>
         </div>
 
-        {/* Customer Selector Dropdown */}
-        <div className="p-2.5 bg-slate-950/60 border-b border-slate-800 flex items-center gap-2">
-          <UserPlus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <select
-            value={selectedCustomerId}
-            onChange={(e) => setSelectedCustomerId(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg py-1 px-2 text-xs text-white focus:outline-none focus:border-blue-500"
-          >
-            <option value="">Walk-in Customer</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.phone}) — Due: PKR {c.dueBalance}
-              </option>
-            ))}
-          </select>
+        {/* Searchable Khata Customer Picker */}
+        <div className="p-2.5 bg-slate-950/60 border-b border-slate-800 space-y-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomerPickerOpen(!customerPickerOpen)}
+              className="flex-1 flex items-center justify-between gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg py-1.5 px-2.5 text-xs text-white transition-colors cursor-pointer min-w-0"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <UserPlus className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span className="truncate font-semibold">
+                  {selectedCustomer
+                    ? `${selectedCustomer.name} (${selectedCustomer.phone})`
+                    : 'Walk-in Customer (Search Khata...)'}
+                </span>
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${customerPickerOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {selectedCustomer && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCustomerId('');
+                  setCustomerSearchQuery('');
+                }}
+                className="p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-400 hover:text-white cursor-pointer"
+                title="Reset to Walk-in Customer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {customerPickerOpen && (
+            <div className="p-2 bg-slate-900 border border-slate-700 rounded-xl space-y-2 shadow-xl">
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Search Khata by name, phone or address..."
+                    value={customerSearchQuery}
+                    onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                {onAddCustomer && (
+                  <button
+                    type="button"
+                    onClick={() => setQuickAddCustOpen(!quickAddCustOpen)}
+                    className="px-2 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold shrink-0 cursor-pointer"
+                  >
+                    + New
+                  </button>
+                )}
+              </div>
+
+              {quickAddCustOpen && onAddCustomer && (
+                <div className="p-2 bg-slate-950 border border-emerald-500/30 rounded-lg space-y-1.5">
+                  <input
+                    type="text"
+                    placeholder="Customer Name *"
+                    value={quickCustName}
+                    onChange={(e) => setQuickCustName(e.target.value)}
+                    className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Phone *"
+                      value={quickCustPhone}
+                      onChange={(e) => setQuickCustPhone(e.target.value)}
+                      className="flex-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!quickCustName.trim() || !quickCustPhone.trim()) return;
+                        const created = onAddCustomer({
+                          shopId: activeShop.id,
+                          name: quickCustName.trim(),
+                          phone: quickCustPhone.trim(),
+                          dueBalance: 0,
+                          loyaltyPoints: 0,
+                          totalPurchases: 0,
+                          ledger: [],
+                        });
+                        if (created && created.id) {
+                          setSelectedCustomerId(created.id);
+                        }
+                        setQuickCustName('');
+                        setQuickCustPhone('+92 3');
+                        setQuickAddCustOpen(false);
+                        setCustomerPickerOpen(false);
+                      }}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-bold cursor-pointer"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="max-h-44 overflow-y-auto space-y-1 pr-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCustomerId('');
+                    setCustomerPickerOpen(false);
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-between ${
+                    selectedCustomerId === ''
+                      ? 'bg-blue-600/20 text-blue-300 font-bold border border-blue-500/40'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <span>Walk-in Customer (No Khata)</span>
+                </button>
+
+                {customers
+                  .filter((c) => {
+                    const q = customerSearchQuery.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      c.name.toLowerCase().includes(q) ||
+                      c.phone.toLowerCase().includes(q) ||
+                      (c.address || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCustomerId(c.id);
+                        setCustomerPickerOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-between gap-2 ${
+                        selectedCustomerId === c.id
+                          ? 'bg-blue-600/20 text-white border border-blue-500/40'
+                          : 'text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold truncate">{c.name}</div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {c.phone}{c.address ? ` • ${c.address}` : ''}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-mono font-bold shrink-0 ${
+                          c.dueBalance > 0 ? 'text-amber-400' : 'text-emerald-400'
+                        }`}
+                      >
+                        Due: {activeShop.currency} {c.dueBalance.toLocaleString()}
+                      </span>
+                    </button>
+                  ))}
+
+                {customers.filter((c) => {
+                  const q = customerSearchQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return (
+                    c.name.toLowerCase().includes(q) ||
+                    c.phone.toLowerCase().includes(q) ||
+                    (c.address || '').toLowerCase().includes(q)
+                  );
+                }).length === 0 && (
+                  <div className="text-center py-3 text-[11px] text-slate-500">
+                    No Khata customer matches "{customerSearchQuery}".
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Customer Balance Banner if selected */}
@@ -596,34 +820,28 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
             <span className="text-[11px] font-mono text-slate-400">{activeShop.currency}</span>
           </div>
 
-          {/* Overall Bill Discount */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
-              <span>Overall Bill Discount</span>
-              <span className="text-blue-400 font-bold cursor-pointer" onClick={() => setBillDiscountType(billDiscountType === 'fixed' ? 'percent' : 'fixed')}>
-                Mode: {billDiscountType === 'fixed' ? 'PKR (Flat)' : '% (Percent)'}
-              </span>
-            </label>
-            <div className="flex gap-1.5">
-              <input
-                type="number"
-                placeholder="0"
-                value={billDiscountValue || ''}
-                onChange={(e) => setBillDiscountValue(Number(e.target.value))}
-                className="w-full p-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setBillDiscountType(billDiscountType === 'fixed' ? 'percent' : 'fixed')}
-                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-300 font-bold rounded-xl text-xs"
-              >
-                {billDiscountType === 'fixed' ? 'PKR' : '%'}
-              </button>
-            </div>
-          </div>
-
-          {/* Tax & Delivery Charge */}
+          {/* Optional Bill Discount Toggle & Tax Toggle */}
           <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-white">Discount</div>
+                <div className="text-[10px] text-slate-500">Optional</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={billDiscountEnabled}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setBillDiscountEnabled(checked);
+                  if (checked && billDiscountValue === 0 && (activeShop.defaultDiscountRate ?? 0) > 0) {
+                    setBillDiscountType('percent');
+                    setBillDiscountValue(activeShop.defaultDiscountRate ?? 0);
+                  }
+                }}
+                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+              />
+            </div>
+
             <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
               <div>
                 <div className="font-semibold text-white">Tax ({activeShop.defaultTaxRate}%)</div>
@@ -636,17 +854,45 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                 className="w-4 h-4 accent-blue-600 rounded cursor-pointer"
               />
             </div>
+          </div>
 
-            <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 space-y-0.5">
-              <label className="text-[10px] font-semibold text-slate-400">Delivery / Fee</label>
-              <input
-                type="number"
-                placeholder="0"
-                value={deliveryCharge || ''}
-                onChange={(e) => setDeliveryCharge(Number(e.target.value))}
-                className="w-full p-0.5 bg-transparent font-mono text-white text-xs focus:outline-none"
-              />
+          {billDiscountEnabled && (
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-amber-300 flex items-center justify-between">
+                <span>Bill Discount</span>
+                <span className="text-blue-400 font-bold cursor-pointer" onClick={() => setBillDiscountType(billDiscountType === 'fixed' ? 'percent' : 'fixed')}>
+                  Mode: {billDiscountType === 'fixed' ? `${activeShop.currency} (Flat)` : '% (Percent)'}
+                </span>
+              </label>
+              <div className="flex gap-1.5">
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={billDiscountValue || ''}
+                  onChange={(e) => setBillDiscountValue(Number(e.target.value))}
+                  className="w-full p-2 bg-slate-950 border border-amber-500/40 rounded-xl text-white font-mono text-xs focus:border-amber-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setBillDiscountType(billDiscountType === 'fixed' ? 'percent' : 'fixed')}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold rounded-xl text-xs"
+                >
+                  {billDiscountType === 'fixed' ? activeShop.currency : '%'}
+                </button>
+              </div>
             </div>
+          )}
+
+          {/* Delivery Charge */}
+          <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between gap-2 text-xs">
+            <label className="text-[11px] font-semibold text-slate-400 shrink-0">Delivery / Fee</label>
+            <input
+              type="number"
+              placeholder="0"
+              value={deliveryCharge || ''}
+              onChange={(e) => setDeliveryCharge(Number(e.target.value))}
+              className="w-24 text-right p-1 bg-slate-900 border border-slate-700 rounded-lg font-mono text-white text-xs focus:outline-none"
+            />
           </div>
 
           {/* Detailed Financial Breakdown */}
@@ -717,6 +963,115 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
             <span className="text-white text-sm font-bold">&rarr;</span>
           </div>
         </button>
+      </div>
+    )}
+    {/* Scanned Barcode Quantity Prompt Modal */}
+    {qtyPromptProduct && (
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-slate-900 border-2 border-blue-500/60 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0">
+              <Barcode className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Product Detected</div>
+              <h4 className="text-sm font-bold text-white leading-snug">{qtyPromptProduct.name}</h4>
+              <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                {activeShop.currency} {qtyPromptProduct.sellingPrice.toLocaleString()} • Stock: {qtyPromptProduct.stockQuantity} {qtyPromptProduct.unit}
+              </div>
+              {(() => {
+                const days = getDaysUntilExpiry(qtyPromptProduct.expiryDate);
+                if (days === null || days > 30) return null;
+                return (
+                  <div className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded inline-block ${
+                    days < 0 ? 'bg-rose-500/20 text-rose-300' : 'bg-orange-500/20 text-orange-300'
+                  }`}>
+                    {days < 0
+                      ? `WARNING: EXPIRED (${qtyPromptProduct.expiryDate})`
+                      : `Near Expiry: ${qtyPromptProduct.expiryDate} (${days}d left)`}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-slate-300 block">Enter Quantity:</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setQtyPromptValue((q) => Math.max(1, q - 1))}
+                className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <input
+                type="number"
+                min={1}
+                autoFocus
+                value={qtyPromptValue}
+                onChange={(e) => setQtyPromptValue(Math.max(1, Number(e.target.value) || 1))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    addToCart(qtyPromptProduct, qtyPromptValue);
+                    showTerminalNotice(`Added ${qtyPromptValue} x ${qtyPromptProduct.name}`, 'info');
+                    setQtyPromptProduct(null);
+                  }
+                }}
+                className="flex-1 text-center py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono text-lg font-black focus:border-blue-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setQtyPromptValue((q) => q + 1)}
+                className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center justify-center"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex justify-center gap-2 pt-1">
+              {[1, 2, 5, 10].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setQtyPromptValue(preset)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                    qtyPromptValue === preset
+                      ? 'bg-blue-600 border-blue-500 text-white'
+                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  x{preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-center text-xs font-bold text-emerald-400 font-mono">
+            Line Total: {activeShop.currency} {(qtyPromptProduct.sellingPrice * qtyPromptValue).toLocaleString()}
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setQtyPromptProduct(null)}
+              className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                addToCart(qtyPromptProduct, qtyPromptValue);
+                showTerminalNotice(`Added ${qtyPromptValue} x ${qtyPromptProduct.name}`, 'info');
+                setQtyPromptProduct(null);
+              }}
+              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Add to Cart
+            </button>
+          </div>
+        </div>
       </div>
     )}
     </div>

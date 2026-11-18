@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Product, Sale, Shop, User } from '../types/pos';
+import { getShopEntitlements } from '../data/saasConfig';
 import { 
   TrendingUp, 
   ShoppingBag, 
@@ -8,16 +9,15 @@ import {
   Package, 
   Plus, 
   Barcode, 
-  FileText, 
   ArrowUpRight, 
   Clock, 
   Printer, 
   ShieldAlert, 
   Settings, 
-  CheckCircle2,
   Calendar,
   Sparkles,
-  Calculator
+  Calculator,
+  Lock
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -32,6 +32,7 @@ interface DashboardViewProps {
   onOpenOnboarding: () => void;
   onViewReceipt: (sale: Sale) => void;
   onOpenZReport?: () => void;
+  onOpenUpgrade?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -46,8 +47,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenOnboarding,
   onViewReceipt,
   onOpenZReport,
+  onOpenUpgrade,
 }) => {
   const isCashier = currentUser.role === 'cashier';
+  const entitlements = getShopEntitlements(activeShop);
 
   // 1. KPI Calculations
   const todayTotalSales = sales.reduce((sum, s) => sum + s.grandTotal, 0);
@@ -63,7 +66,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return totalProfit + saleProfit;
   }, 0);
 
+  const getDaysUntilExpiry = (expiryDate?: string): number | null => {
+    if (!expiryDate || !expiryDate.trim()) return null;
+    const exp = new Date(expiryDate);
+    if (Number.isNaN(exp.getTime())) return null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(exp.getFullYear(), exp.getMonth(), exp.getDate());
+    return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
   const lowStockProducts = products.filter((p) => p.stockQuantity <= p.minimumStockLimit);
+  const expiredProducts = products.filter((p) => {
+    const d = getDaysUntilExpiry(p.expiryDate);
+    return d !== null && d < 0;
+  });
+  const nearExpiryProducts = products.filter((p) => {
+    const d = getDaysUntilExpiry(p.expiryDate);
+    return d !== null && d >= 0 && d <= 30;
+  });
+  const expiryAlertProducts = [...expiredProducts, ...nearExpiryProducts];
   const totalInventoryValuation = products.reduce((sum, p) => sum + p.costPrice * p.stockQuantity, 0);
   const totalRetailValuation = products.reduce((sum, p) => sum + p.sellingPrice * p.stockQuantity, 0);
 
@@ -160,8 +182,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 5 Main KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      {/* 6 Main KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {/* KPI 1: Today's Total Sales */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4.5 hover:border-emerald-500/40 transition-all shadow-lg">
           <div className="flex items-center justify-between text-slate-400 mb-2">
@@ -263,13 +285,109 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="text-xl md:text-2xl font-bold text-purple-400 font-mono truncate">
                 {activeShop.currency} {Math.round(totalInventoryValuation).toLocaleString()}
               </div>
-              <div className="text-[11px] text-slate-400 mt-1">
+              <div className="text-[11px] text-slate-400 mt-1 truncate">
                 Retail: {activeShop.currency} {Math.round(totalRetailValuation).toLocaleString()}
               </div>
             </>
           )}
         </div>
+
+        {/* KPI 6: Expiry Alerts (Business Pro Monthly) */}
+        <div
+          onClick={entitlements.allowExpiryAlerts ? onNavigateToInventory : onOpenUpgrade}
+          className={`bg-slate-900 border rounded-2xl p-4.5 transition-all shadow-lg cursor-pointer ${
+            !entitlements.allowExpiryAlerts
+              ? 'border-slate-800 hover:border-indigo-500/40'
+              : expiredProducts.length > 0
+              ? 'border-rose-500/40 hover:border-rose-400'
+              : nearExpiryProducts.length > 0
+              ? 'border-amber-500/40 hover:border-amber-400'
+              : 'border-slate-800 hover:border-slate-700'
+          }`}
+        >
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium">Expiry Alerts</span>
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+              !entitlements.allowExpiryAlerts
+                ? 'bg-indigo-500/20 text-indigo-400'
+                : expiredProducts.length > 0
+                ? 'bg-rose-500/20 text-rose-400'
+                : 'bg-amber-500/20 text-amber-400'
+            }`}>
+              {entitlements.allowExpiryAlerts ? <Clock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+            </div>
+          </div>
+          {!entitlements.allowExpiryAlerts ? (
+            <>
+              <div className="text-sm font-bold text-indigo-300 font-mono">
+                Business Pro
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1 truncate">
+                Locked on Starter Monthly
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={`text-xl md:text-2xl font-bold font-mono ${
+                expiredProducts.length > 0
+                  ? 'text-rose-400'
+                  : nearExpiryProducts.length > 0
+                  ? 'text-amber-400'
+                  : 'text-emerald-400'
+              }`}>
+                {expiryAlertProducts.length} <span className="text-xs font-normal text-slate-400">Items</span>
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1 truncate">
+                {expiredProducts.length} expired · {nearExpiryProducts.length} ≤30d
+              </div>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Near-Expiry / Expired Products Alert Banner (Business Pro Monthly) */}
+      {entitlements.allowExpiryAlerts && expiryAlertProducts.length > 0 && (
+        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+          expiredProducts.length > 0
+            ? 'bg-rose-950/30 border-rose-500/40'
+            : 'bg-amber-950/30 border-amber-500/40'
+        }`}>
+          <div className="space-y-1.5 min-w-0">
+            <div className={`text-xs font-bold flex items-center gap-2 ${
+              expiredProducts.length > 0 ? 'text-rose-300' : 'text-amber-300'
+            }`}>
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>
+                Near-Expiry & Expired Inventory Warning ({expiredProducts.length} Expired, {nearExpiryProducts.length} Expiring within 30 days)
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {expiryAlertProducts.slice(0, 4).map((p) => {
+                const days = getDaysUntilExpiry(p.expiryDate) ?? 0;
+                return (
+                  <span
+                    key={p.id}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono ${
+                      days < 0
+                        ? 'bg-rose-500/15 border-rose-500/30 text-rose-200'
+                        : 'bg-amber-500/15 border-amber-500/30 text-amber-200'
+                    }`}
+                  >
+                    {p.name}: {days < 0 ? `EXPIRED (${Math.abs(days)}d ago)` : days === 0 ? 'Expires TODAY' : `${days}d left`}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          <button
+            onClick={onNavigateToInventory}
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white rounded-xl text-xs font-semibold shrink-0 cursor-pointer"
+          >
+            Review Catalog &rarr;
+          </button>
+        </div>
+      )}
 
       {/* Main Grid: 7-Day Chart & Top Sellers */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

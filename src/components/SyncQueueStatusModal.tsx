@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import { SyncQueueItem, Shop } from '../types/pos';
+import { getShopEntitlements } from '../data/saasConfig';
 import { 
   X, 
   Cloud, 
   CloudOff, 
   RefreshCw, 
-  CheckCircle2, 
-  AlertCircle, 
   Database, 
   Wifi, 
   WifiOff, 
-  Layers, 
-  Check 
+  Lock
 } from 'lucide-react';
 
 interface SyncQueueStatusModalProps {
@@ -21,6 +19,7 @@ interface SyncQueueStatusModalProps {
   isCloudConnected: boolean;
   onToggleCloudMode: () => void;
   onForceReplaySync: () => Promise<void>;
+  onOpenUpgrade?: () => void;
 }
 
 export const SyncQueueStatusModal: React.FC<SyncQueueStatusModalProps> = ({
@@ -30,7 +29,9 @@ export const SyncQueueStatusModal: React.FC<SyncQueueStatusModalProps> = ({
   isCloudConnected,
   onToggleCloudMode,
   onForceReplaySync,
+  onOpenUpgrade,
 }) => {
+  const entitlements = getShopEntitlements(shop);
   const [isSyncing, setIsSyncing] = useState(false);
   const [queueItems, setQueueItems] = useState<SyncQueueItem[]>([
     {
@@ -124,6 +125,33 @@ export const SyncQueueStatusModal: React.FC<SyncQueueStatusModalProps> = ({
 
         {/* Content */}
         <div className="p-5 overflow-y-auto space-y-5">
+          {/* Plan Gate Banner on Starter Monthly */}
+          {!entitlements.allowCloudSync && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-start gap-2">
+                <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-amber-300">Cloud Sync Disabled on {entitlements.planName}</div>
+                  <p className="text-[11px] text-slate-400">
+                    Your store runs locally on this device. Upgrade to Business Pro Monthly to enable Cloud Firestore sync across branches.
+                  </p>
+                </div>
+              </div>
+              {onOpenUpgrade && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenUpgrade();
+                  }}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-[11px] shrink-0 cursor-pointer"
+                >
+                  Upgrade to Pro
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Status Banner */}
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div>
@@ -132,16 +160,21 @@ export const SyncQueueStatusModal: React.FC<SyncQueueStatusModalProps> = ({
                 Local Drift/SQLite Database Status
               </div>
               <p className="text-slate-400 mt-0.5">
-                All transactions write locally to SQLite first, then stream to Cloud Firestore in batches.
+                {entitlements.allowCloudSync
+                  ? 'All transactions write locally to SQLite first, then stream to Cloud Firestore in batches.'
+                  : 'All transactions stay stored locally in SQLite on Starter Monthly.'}
               </p>
             </div>
 
             <button
               onClick={onToggleCloudMode}
+              disabled={!entitlements.allowCloudSync}
               className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 ${
-                isCloudConnected
-                  ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30'
-                  : 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30'
+                !entitlements.allowCloudSync
+                  ? 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                  : isCloudConnected
+                  ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 cursor-pointer'
+                  : 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 cursor-pointer'
               }`}
             >
               {isCloudConnected ? <WifiOff className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
@@ -164,7 +197,9 @@ export const SyncQueueStatusModal: React.FC<SyncQueueStatusModalProps> = ({
               <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">
                 {queueItems.filter((i) => i.status === 'synced').length} items
               </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Active mirroring</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                {entitlements.allowCloudSync ? 'Active mirroring' : 'Requires Business Pro'}
+              </div>
             </div>
           </div>
 
@@ -179,11 +214,15 @@ export const SyncQueueStatusModal: React.FC<SyncQueueStatusModalProps> = ({
 
             <button
               onClick={handleForceSync}
-              disabled={isSyncing}
-              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/30"
+              disabled={isSyncing || !entitlements.allowCloudSync}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+                !entitlements.allowCloudSync
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 cursor-pointer'
+              }`}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Syncing...' : 'Force Replay Queue'}
+              {isSyncing ? 'Syncing...' : entitlements.allowCloudSync ? 'Force Replay Queue' : 'Pro Required'}
             </button>
           </div>
 

@@ -22,9 +22,11 @@ import {
   Cpu,
   CheckCircle2,
   Download,
-  Check
+  Check,
+  FolderArchive
 } from 'lucide-react';
-import { downloadFlutterProjectZip } from '../services/flutterExportService';
+import { downloadFlutterProjectZip, FLUTTER_PROJECT_FILES } from '../services/flutterExportService';
+import { FlutterZipExplorerModal } from './FlutterZipExplorerModal';
 
 interface PhaseMeta {
   id: number;
@@ -106,6 +108,7 @@ export const FlutterArchitectureHub: React.FC = () => {
   const [activePhase, setActivePhase] = useState<number>(8);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isZipExplorerOpen, setIsZipExplorerOpen] = useState(false);
 
   const handleDownloadZip = async () => {
     setIsDownloading(true);
@@ -149,6 +152,14 @@ export const FlutterArchitectureHub: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
+              onClick={() => setIsZipExplorerOpen(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer min-h-[44px]"
+            >
+              <FolderArchive className="w-4 h-4 text-cyan-400" />
+              <span>ZIP Explorer ({FLUTTER_PROJECT_FILES.length} Files)</span>
+            </button>
+
+            <button
               onClick={handleDownloadZip}
               disabled={isDownloading}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer min-h-[44px]"
@@ -158,7 +169,13 @@ export const FlutterArchitectureHub: React.FC = () => {
               ) : (
                 <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
               )}
-              <span>{downloadSuccess ? 'Downloaded!' : isDownloading ? 'Packaging...' : 'Download Project (.zip)'}</span>
+              <span>
+                {downloadSuccess
+                  ? 'Downloaded!'
+                  : isDownloading
+                  ? 'Packaging...'
+                  : `Download Complete ZIP (${FLUTTER_PROJECT_FILES.length})`}
+              </span>
             </button>
 
             <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800/80 px-4 py-2 rounded-xl min-h-[44px]">
@@ -230,6 +247,11 @@ export const FlutterArchitectureHub: React.FC = () => {
         {activePhase === 7 && <Phase7CodeViewer />}
         {activePhase === 8 && <Phase8CodeViewer />}
       </div>
+
+      <FlutterZipExplorerModal
+        isOpen={isZipExplorerOpen}
+        onClose={() => setIsZipExplorerOpen(false)}
+      />
     </div>
   );
 };

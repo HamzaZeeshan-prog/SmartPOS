@@ -10,13 +10,15 @@ import {
   Sparkles,
   Check,
   Layers,
-  Code
+  Code,
+  FolderArchive
 } from 'lucide-react';
-import { downloadFlutterProjectZip } from '../services/flutterExportService';
+import { downloadFlutterProjectZip, FLUTTER_PROJECT_FILES } from '../services/flutterExportService';
+import { FlutterZipExplorerModal } from './FlutterZipExplorerModal';
 
 interface FlutterMobileFrameProps {
   children: React.ReactNode;
-  onOpenCodeHub: () => void;
+  onOpenCodeHub?: () => void;
 }
 
 export type DeviceMode = 'phone' | 'tablet' | 'responsive';
@@ -29,6 +31,7 @@ export const FlutterMobileFrame: React.FC<FlutterMobileFrameProps> = ({
   const [currentTime, setCurrentTime] = useState('09:41');
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isZipExplorerOpen, setIsZipExplorerOpen] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -109,13 +112,25 @@ export const FlutterMobileFrame: React.FC<FlutterMobileFrameProps> = ({
 
           {/* Right: Flutter Export & Code Hub Actions */}
           <div className="flex items-center gap-2">
+            {onOpenCodeHub && (
+              <button
+                onClick={onOpenCodeHub}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[36px]"
+                title="Open full Flutter & Dart Architecture Viewer"
+              >
+                <Code className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden sm:inline">Dart Code Hub</span>
+              </button>
+            )}
+
             <button
-              onClick={onOpenCodeHub}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[36px]"
-              title="Open full Flutter & Dart Architecture Viewer"
+              onClick={() => setIsZipExplorerOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[36px]"
+              title="Browse all packaged Flutter files before downloading"
             >
-              <Code className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden sm:inline">Dart Code Hub</span>
+              <FolderArchive className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">ZIP Explorer ({FLUTTER_PROJECT_FILES.length})</span>
+              <span className="sm:hidden">ZIP ({FLUTTER_PROJECT_FILES.length})</span>
             </button>
 
             <button
@@ -129,7 +144,13 @@ export const FlutterMobileFrame: React.FC<FlutterMobileFrameProps> = ({
               ) : (
                 <Download className={`w-3.5 h-3.5 ${isDownloading ? 'animate-bounce' : ''}`} />
               )}
-              <span>{downloadSuccess ? 'Downloaded!' : isDownloading ? 'Packaging...' : 'Download Flutter App (.zip)'}</span>
+              <span>
+                {downloadSuccess
+                  ? 'Downloaded!'
+                  : isDownloading
+                  ? 'Packaging...'
+                  : `Download Flutter App (${FLUTTER_PROJECT_FILES.length} files .zip)`}
+              </span>
             </button>
           </div>
         </div>
@@ -194,6 +215,11 @@ export const FlutterMobileFrame: React.FC<FlutterMobileFrameProps> = ({
           </div>
         )}
       </div>
+
+      <FlutterZipExplorerModal
+        isOpen={isZipExplorerOpen}
+        onClose={() => setIsZipExplorerOpen(false)}
+      />
     </div>
   );
 };

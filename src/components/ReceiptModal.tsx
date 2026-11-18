@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sale, Shop } from '../types/pos';
+import { shareReceiptAsPdf } from '../services/pdfReceiptService';
 import { 
   Printer, 
   Download, 
@@ -35,6 +36,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const [paperWidth, setPaperWidth] = useState<'80mm' | '58mm'>(shop.thermalPrinterWidth || '80mm');
   const [isCopied, setIsCopied] = useState(false);
   const [drawerKicked, setDrawerKicked] = useState(false);
+  const [pdfNotice, setPdfNotice] = useState<string | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   if (!isOpen) return null;
 
@@ -120,33 +123,22 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  // WhatsApp formatted receipt link generator
-  const handleShareWhatsApp = () => {
-    const summary = `*🧾 ${shop.name} - Official Receipt*
-*Invoice #:* ${sale.invoiceNumber}
-*Date:* ${new Date(sale.createdAt).toLocaleString()}
-*Customer:* ${sale.customerName || 'Valued Customer'}
-*Cashier:* ${sale.cashierName}
-----------------------------
-${sale.items.map((i) => `• ${i.product.name} (x${i.quantity}) - ${shop.currency} ${i.quantity * i.unitPrice}`).join('\n')}
-----------------------------
-*Subtotal:* ${shop.currency} ${sale.subtotal}
-*Discount:* -${shop.currency} ${sale.discountTotal}
-*Tax (GST):* +${shop.currency} ${sale.taxTotal}
-*Grand Total:* *${shop.currency} ${sale.grandTotal}*
-*Payment:* ${sale.payments.map((p) => `${p.method.toUpperCase()} (${shop.currency} ${p.amount})`).join(', ')}
-----------------------------
-${shop.receiptMessage || 'Thank you for shopping with us!'}`;
-
-    navigator.clipboard.writeText(summary);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2500);
-
-    const url = `https://wa.me/?text=${encodeURIComponent(summary)}`;
+  // Share actual formatted PDF receipt (WhatsApp / System Share Sheet or PDF Download fallback)
+  const handleShareWhatsAppPdf = async () => {
+    setIsExportingPdf(true);
     try {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const outcome = await shareReceiptAsPdf(sale, shop, paperWidth);
+      setPdfNotice(
+        outcome === 'shared'
+          ? 'PDF receipt shared via device Share Sheet (WhatsApp ready)!'
+          : `PDF receipt downloaded (Receipt_${sale.invoiceNumber}.pdf) — attach directly in WhatsApp!`
+      );
+      setTimeout(() => setPdfNotice(null), 4000);
     } catch {
-      // Handled via clipboard copy
+      setPdfNotice('Could not generate PDF receipt.');
+      setTimeout(() => setPdfNotice(null), 3500);
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -577,11 +569,17 @@ ${shop.receiptMessage || 'Thank you for shopping with us!'}`;
           )}
         </div>
 
-        {/* Drawer Kicked Alert Feedback */}
+        {/* Drawer Kicked & PDF Share Feedback */}
         {drawerKicked && (
           <div className="bg-amber-500/20 border-y border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-bold flex items-center justify-center gap-2">
             <DollarSign className="w-4 h-4 animate-bounce" />
             Cash Drawer Solenoid Pulse Fired (ESC p 0 25 250) - Drawer Opened!
+          </div>
+        )}
+        {pdfNotice && (
+          <div className="bg-emerald-500/20 border-y border-emerald-500/40 px-4 py-2 text-center text-xs text-emerald-300 font-bold flex items-center justify-center gap-2">
+            <FileText className="w-4 h-4" />
+            {pdfNotice}
           </div>
         )}
 
@@ -597,11 +595,12 @@ ${shop.receiptMessage || 'Thank you for shopping with us!'}`;
             </button>
 
             <button
-              onClick={handleShareWhatsApp}
-              className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors min-h-[44px]"
+              onClick={handleShareWhatsAppPdf}
+              disabled={isExportingPdf}
+              className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors min-h-[44px] cursor-pointer disabled:opacity-50"
             >
               <Share2 className="w-4 h-4 text-emerald-400" />
-              WhatsApp Slip
+              {isExportingPdf ? 'Generating PDF...' : 'Share PDF (WhatsApp)'}
             </button>
 
             <button

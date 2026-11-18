@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Shop } from '../types/pos';
+import { CITY_OPTIONS, CUSTOM_CITY_OPTION } from '../data/cities';
 import { 
   Store, 
   MapPin, 
@@ -7,19 +8,17 @@ import {
   User, 
   DollarSign, 
   Percent, 
-  FileText, 
   CheckCircle2, 
   X, 
-  ArrowRight,
-  ShieldCheck,
   Printer
 } from 'lucide-react';
 
 interface OnboardingWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveShop: (shop: Shop) => void;
+  onSaveShop: (shop: Shop, populateStarter?: boolean) => void;
   existingShop?: Shop;
+  currentOwnerName?: string;
 }
 
 export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
@@ -27,50 +26,89 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   onClose,
   onSaveShop,
   existingShop,
+  currentOwnerName = 'Tariq Mehmood',
 }) => {
-  const [shopName, setShopName] = useState(existingShop?.name || 'City Mart - F-7 Branch');
-  const [ownerName, setOwnerName] = useState(existingShop?.ownerName || 'Tariq Mehmood');
-  const [phone, setPhone] = useState(existingShop?.phone || '+92 51 2891234');
+  const [shopName, setShopName] = useState(existingShop?.name || '');
+  const [ownerName, setOwnerName] = useState(existingShop?.ownerName || currentOwnerName);
+  const [phone, setPhone] = useState(existingShop?.phone || '+92 3');
   const [category, setCategory] = useState(existingShop?.category || 'Grocery & Supermarket');
-  const [address, setAddress] = useState(existingShop?.address || 'Shop 14-16, F-7 Markaz, Jinnah Super');
-  const [city, setCity] = useState(existingShop?.city || 'Islamabad');
+  const [address, setAddress] = useState(existingShop?.address || '');
+  const initialCity = existingShop?.city || 'Mianwali';
+  const isPresetCity = CITY_OPTIONS.includes(initialCity) && initialCity !== CUSTOM_CITY_OPTION;
+  const [city, setCity] = useState(isPresetCity ? initialCity : CUSTOM_CITY_OPTION);
+  const [customCity, setCustomCity] = useState(isPresetCity ? '' : initialCity);
   const [currency, setCurrency] = useState(existingShop?.currency || 'PKR');
   const [taxEnabled, setTaxEnabled] = useState(existingShop?.taxEnabled ?? true);
   const [defaultTaxRate, setDefaultTaxRate] = useState(existingShop?.defaultTaxRate ?? 5);
+  const [discountEnabled, setDiscountEnabled] = useState(existingShop?.discountEnabled ?? false);
+  const [defaultDiscountRate, setDefaultDiscountRate] = useState(existingShop?.defaultDiscountRate ?? 5);
   const [receiptMessage, setReceiptMessage] = useState(
-    existingShop?.receiptMessage || 'Thank you for shopping at City Mart! Exchange within 3 days with receipt.'
+    existingShop?.receiptMessage || 'Thank you for your visit! Exchange within 3 days with receipt.'
   );
   const [thermalPrinterWidth, setThermalPrinterWidth] = useState<'58mm' | '80mm'>(
     existingShop?.thermalPrinterWidth || '80mm'
   );
   const [allowNegativeStock, setAllowNegativeStock] = useState(existingShop?.allowNegativeStock ?? false);
+  const [populateStarter, setPopulateStarter] = useState(!existingShop);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    setValidationError(null);
+    setShopName(existingShop?.name || '');
+    setOwnerName(existingShop?.ownerName || currentOwnerName);
+    setPhone(existingShop?.phone || '+92 3');
+    setCategory(existingShop?.category || 'Grocery & Supermarket');
+    setAddress(existingShop?.address || '');
+    const nextCity = existingShop?.city || 'Mianwali';
+    const nextIsPreset = CITY_OPTIONS.includes(nextCity) && nextCity !== CUSTOM_CITY_OPTION;
+    setCity(nextIsPreset ? nextCity : CUSTOM_CITY_OPTION);
+    setCustomCity(nextIsPreset ? '' : nextCity);
+    setCurrency(existingShop?.currency || 'PKR');
+    setTaxEnabled(existingShop?.taxEnabled ?? true);
+    setDefaultTaxRate(existingShop?.defaultTaxRate ?? 5);
+    setDiscountEnabled(existingShop?.discountEnabled ?? false);
+    setDefaultDiscountRate(existingShop?.defaultDiscountRate ?? 5);
+    setReceiptMessage(
+      existingShop?.receiptMessage || 'Thank you for your visit! Exchange within 3 days with receipt.'
+    );
+    setThermalPrinterWidth(existingShop?.thermalPrinterWidth || '80mm');
+    setAllowNegativeStock(existingShop?.allowNegativeStock ?? false);
+    setPopulateStarter(!existingShop);
+  }, [existingShop, isOpen, currentOwnerName]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!shopName.trim() || !phone.trim() || !address.trim()) {
-      alert('Please fill in all required fields (Shop Name, Phone, and Address).');
+    const resolvedCity = city === CUSTOM_CITY_OPTION ? customCity.trim() : city.trim();
+    if (!shopName.trim() || !phone.trim() || !address.trim() || !resolvedCity) {
+      setValidationError('Please fill in all required fields (Shop Name, Phone, City, and Address).');
       return;
     }
 
     const savedShop: Shop = {
+      ...(existingShop || {}),
       id: existingShop?.id || `shop_${Date.now()}`,
-      name: shopName,
-      ownerName,
-      phone,
+      name: shopName.trim(),
+      ownerName: ownerName.trim(),
+      phone: phone.trim(),
       category,
-      address,
-      city,
+      address: address.trim(),
+      city: resolvedCity,
       currency,
       taxEnabled,
       defaultTaxRate: taxEnabled ? defaultTaxRate : 0,
-      receiptMessage,
+      discountEnabled,
+      defaultDiscountRate: discountEnabled ? defaultDiscountRate : 0,
+      receiptMessage: receiptMessage.trim(),
       thermalPrinterWidth,
       allowNegativeStock,
+      subscriptionStatus: existingShop?.subscriptionStatus || 'active',
+      createdAt: existingShop?.createdAt || new Date().toISOString(),
     };
 
-    onSaveShop(savedShop);
+    onSaveShop(savedShop, !existingShop && populateStarter);
     onClose();
   };
 
@@ -98,7 +136,12 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
         </div>
 
         {/* Wizard Form */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-5">
+          {validationError && (
+            <div className="p-3 bg-rose-500/15 border border-rose-500/40 rounded-xl text-rose-300 text-xs font-semibold">
+              {validationError}
+            </div>
+          )}
           {/* Section 1: Business Identity */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -200,16 +243,35 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 <label className="text-xs font-semibold text-slate-300 block mb-1">
                   City *
                 </label>
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:border-blue-500 focus:outline-none cursor-pointer"
+                >
+                  {CITY_OPTIONS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {city === CUSTOM_CITY_OPTION && (
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Custom City Name *
+                </label>
                 <input
                   type="text"
                   required
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Islamabad"
-                  className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:border-blue-500 focus:outline-none"
+                  value={customCity}
+                  onChange={(e) => setCustomCity(e.target.value)}
+                  placeholder="Enter your city or town..."
+                  className="w-full p-2.5 bg-slate-950 border border-emerald-500/50 rounded-xl text-white text-xs focus:border-emerald-400 focus:outline-none"
                 />
               </div>
-            </div>
+            )}
           </div>
 
           {/* Section 3: Financial & Tax */}
@@ -269,6 +331,39 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 </div>
               </div>
             )}
+
+            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-white">Optional Bill Discount (Like GST)</div>
+                <div className="text-[10px] text-slate-400">Enable/disable default checkout discount</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={discountEnabled}
+                onChange={(e) => setDiscountEnabled(e.target.checked)}
+                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+              />
+            </div>
+
+            {discountEnabled && (
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Default Discount Rate (%)
+                </label>
+                <div className="relative">
+                  <Percent className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={defaultDiscountRate}
+                    onChange={(e) => setDefaultDiscountRate(Number(e.target.value))}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 4: Receipt & Peripherals */}
@@ -323,6 +418,25 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:border-blue-500 focus:outline-none"
               />
             </div>
+
+            {!existingShop && (
+              <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>Preload Recommended Starter Products</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Instantly populates 6-8 popular items for {category} with barcodes & pricing
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={populateStarter}
+                  onChange={(e) => setPopulateStarter(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded bg-slate-900 border-slate-700 cursor-pointer"
+                />
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -330,7 +444,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors"
+              className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -339,7 +453,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
               className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              Save & Apply Store Profile
+              {existingShop ? 'Save & Update Store Profile' : 'Register Store & Open Terminal'}
             </button>
           </div>
         </form>

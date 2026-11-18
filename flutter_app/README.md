@@ -1,36 +1,36 @@
-# Smart POS Mobile - Production Flutter Application
+# Smart POS Pro - Production Flutter Mobile Application
 
-A cross-platform mobile retail Point of Sale (POS) application built with **Flutter**, **Dart**, **Drift (SQLite)**, and **Cloud Firestore**.
+A cross-platform multi-tenant SaaS retail Point of Sale (POS) mobile application built with **Flutter**, **Dart**, **Provider**, and **Cloud Firestore**.
 
 ## Features Included
-- **High-Speed POS Terminal**: Fast multi-category search, barcode lookup, cart management, line discounts.
-- **Multi-Rail Payments**: Cash tender & change calculation, JazzCash & Easypaisa QR, Raast EMVCo dynamic QR code, Card POS, and Udhaar (Customer Credit).
-- **Offline First**: Drift SQLite schema with background sync queue to Cloud Firestore.
-- **ESC/POS Hardware Thermal Printing**: 58mm / 80mm ESC/POS command stream, partial cutter, and RJ11/12 cash drawer solenoid kick pulse.
-- **Khata Ledger**: Customer Udhaar balance tracking, repayment ("Wasooli") recording, and 1-tap WhatsApp reminders.
-- **Daily Closing Z-Report**: Cash drawer float reconciliation (balanced, shortage, overage) and shift close slips.
-- **Camera & USB Barcode Scanning**: `mobile_scanner` with laser viewfinder overlay and USB HID wedge listener.
+- **Multi-Tenant SaaS Subscriptions & Super Admin Approval**: Launches into the SaaS Auth Portal (`Business Login`, `Register & Plan`, `Admin Login`). New businesses choose a monthly subscription plan and pay before registration; requests go to the **Super Admin Console** (`admin@omnipos.pk` / `Admin@2026#`) for Approve (30 days), Reject, Block, Unblock, or Complete Month. When the 1-month period completes or Admin blocks access, login is automatically blocked/logged out while **all business data stays intact** until renewed.
+- **Subscription Plan Feature Gating (`Starter Monthly` vs `Business Pro Monthly`)**:
+  - **Starter Monthly (PKR 2,500/mo)**: Enables 1 Storefront, Cashier POS Terminal & Barcode Scanner, Inventory Catalog, Customers & Khata (searchable), Suppliers, Operating Expenses, Sales & Refunds, Store Dashboard, Daily Z-Report, and PDF / ESC/POS Receipts. Disables Multi-Branch stores, Custom Cashiers & Managers, P&L & Margins analytics, Near-Expiry Alerts, and Cloud Firestore sync.
+  - **Business Pro Monthly (PKR 4,900/mo)**: Unlocks Multi-Branch stores, Custom Cashiers & Optional Managers, P&L & Margins analytics, Near-Expiry alert banners/filters, and live Cloud Firestore sync. Includes an in-app **Upgrade Pro** submission dialog routed to Super Admin approval.
+- **Per-Business Staff Management (Business Pro)**: Business owners create and manage their own Cashiers and optional Managers scoped strictly to their store (no hardcoded global staff).
+- **City Support Including Mianwali**: Business registration, onboarding wizard, and branch creation include Mianwali plus 45+ regional cities and custom city fallback.
+- **Interactive Smart POS HUD Logo**: Animated optical barcode scanner badge with haptic pulse & diagnostics modal (Cloud Sync engine / Starter Local status, thermal roll width, Z-Report, audio mute toggle).
+- **Accurate & Intelligent Barcode Scanner**: Normalized barcode matching detects catalog items cleanly, opens the Quantity Prompt dialog, and pushes entered quantities straight into the cart. Supports online product lookup (OpenFoodFacts, OpenProductsFacts, OpenBeautyFacts, UPCitemdb) when adding new products.
+- **Product Expiry Date & Near-Expiry Alerts (Business Pro)**: Track optional product expiry dates in Inventory, surface expired and ≤30-day near-expiry warning banners and badges on the Dashboard & Inventory screens.
+- **Cashier POS Terminal & Optional Discount**: Responsive mobile layout (`320px+`), Catalog | Cart segmented toggle, dynamic store categories, Held Sales pause/resume, item discounts & notes, optional Bill Discount toggle (Flat / %) alongside optional GST toggle, and searchable Khata Customer picker.
+- **Multi-Rail Payments & Searchable Khata**: Cash tender, JazzCash & Easypaisa QR, Raast QR, Card POS, Split Payment, Udhaar / Khata credit with real-time search by customer name, phone, or address, Wasooli repayment recording, and WhatsApp reminders.
+- **PDF Receipts & ESC/POS Thermal Printing**: Generate formatted PDF thermal/A4 receipts (`pdf` + `path_provider`) and share directly as `.pdf` files to WhatsApp via `share_plus`, alongside 58mm / 80mm ESC/POS output (`EscPosService`).
+- **Durable Local Persistence & Session Auto-Restore**: All business profiles, admin approvals, staff accounts, inventory, sales, Khata ledgers, suppliers, expenses, and active login sessions are persisted automatically via `shared_preferences` (plus Cloud Firestore sync/hydration when enabled), so closing and restarting the app restores your session and business data without losing records or requiring re-registration.
+- **Sales Returns & Z-Report**: Partial & full item returns with auto-restock, P&L margin income statement (Business Pro), and end-of-day till cash drawer reconciliation.
 
 ## How to Run
 
-### 1. Install Dependencies
+1. Navigate to the Flutter project directory:
+```bash
+cd flutter_app
+```
+2. Install packages (`shared_preferences`, `pdf`, `http`, `path_provider`, `mobile_scanner`, `share_plus`, `provider`, etc.):
 ```bash
 flutter pub get
 ```
-
-### 2. Generate Drift Database Code
+3. Run on a connected Android/iOS device or emulator:
 ```bash
-flutter pub run build_runner build --delete-conflicting-outputs
+flutter run
 ```
 
-### 3. Run on Mobile Device or Emulator
-```bash
-# Android Device / Emulator
-flutter run -d android
-
-# iOS Simulator / Device
-flutter run -d ios
-
-# Web
-flutter run -d chrome
-```
+*(Note: Ensure Camera permission for `mobile_scanner` and Internet permission for online barcode lookup are enabled in `android/app/src/main/AndroidManifest.xml` / `ios/Runner/Info.plist`. Cloud Firestore sync automatically falls back to local offline mode if `google-services.json` / `GoogleService-Info.plist` is not configured yet, so the app launches cleanly out of the box.)*

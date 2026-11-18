@@ -1,95 +1,130 @@
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'dart:convert';
 import '../models/models.dart';
 
 class EscPosService {
-  /// Generates ESC/POS byte commands for 80mm or 58mm thermal printers
-  static Future<List<int>> generateReceiptBytes({
-    required SaleModel sale,
-    required String shopName,
-    required String shopAddress,
-    required String shopPhone,
-    PaperSize paperSize = PaperSize.mm80,
-  }) async {
-    final profile = await CapabilityProfile.load();
-    final generator = Generator(paperSize, profile);
-    List<int> bytes = [];
+  /// Generates pure ESC/POS command byte buffer for 58mm or 80mm thermal printers.
+  static List<int> generateReceiptBytes({
+    required Sale sale,
+    required Shop shop,
+  }) {
+    final List<int> bytes = [];
+    final int lineWidth = shop.thermalPrinterWidth == PrinterWidth.mm58 ? 32 : 48;
+    final String divider = '-' * lineWidth;
+    final String doubleDivider = '=' * lineWidth;
 
-    // Reset & kick drawer solenoid (ESC p 0 25 250)
-    bytes += generator.reset();
-    bytes += generator.drawer();
+    void addLine(String text) {
+      bytes.addAll(utf8.encode('$text\n'));
+    }
 
-    // Store Header
-    bytes += generator.text(
-      shopName.toUpperCase(),
-      styles: const PosStyles(
-        align: PosAlign.center,
-        height: PosTextSize.size2,
-        width: PosTextSize.size2,
-        bold: true,
-      ),
-    );
-    bytes += generator.text(shopAddress, styles: const PosStyles(align: PosAlign.center));
-    bytes += generator.text('Tel: $shopPhone', styles: const PosStyles(align: PosAlign.center));
-    bytes += generator.text('STRN / NTN Tax Reg #: 892104-5', styles: const PosStyles(align: PosAlign.center));
-    bytes += generator.hr();
+    // ESC @ (Initialize printer)
+    bytes.addAll([0x1B, 0x40]);
+    // Kick cash drawer pulse: ESC p 0 25 250
+    bytes.addAll([0x1B, 0x70, 0x00, 0x19, 0xFA]);
 
-    // Invoice Meta
-    bytes += generator.text('Invoice #: ${sale.invoiceNumber}');
-    bytes += generator.text('Date: ${sale.createdAt.toLocal().toString().substring(0, 19)}');
-    bytes += generator.text('Cashier: ${sale.cashierName}');
+    // Center align header: ESC a 1
+    bytes.addAll([0x1B, 0x61, 0x01]);
+    // Bold on: ESC E 1
+    bytes.addAll([0x1B, 0x45, 0x01]);
+    addLine(shop.name.toUpperCase());
+    // Bold off: ESC E 0
+    bytes.addAll([0x1B, 0x45, 0x00]);
+    addLine(shop.address);
+    addLine('${shop.city} | Tel: ${shop.phone}');
+    addLine(doubleDivider);
+
+    // Left align metadata: ESC a 0
+    bytes.addAll([0x1B, 0x61, 0x00]);
+    addLine('Invoice #: ${sale.invoiceNumber}');
+    addLine('Date: ${sale.createdAt.length >= 16 ? sale.createdAt.substring(0, 16).replaceAll("T", " ") : sale.createdAt}');
+    addLine('Cashier: ${sale.cashierName}');
     if (sale.customerName != null) {
-      bytes += generator.text('Customer: ${sale.customerName}');
+      addLine('Customer: ${sale.customerName}');
     }
-    bytes += generator.hr();
+    addLine(divider);
 
-    // Line Items
+    // Items
     for (final item in sale.items) {
-      bytes += generator.row([
-        PosColumn(
-          text: '${item.product.name} (x${item.quantity})',
-          width: 8,
-          styles: const PosStyles(align: PosAlign.left),
-        ),
-        PosColumn(
-          text: '${item.lineTotal.toInt()}',
-          width: 4,
-          styles: const PosStyles(align: PosAlign.right, bold: true),
-        ),
-      ]);
+      final qtyLabel = '${item.quantity}x ${item.product.name}';
+      final priceLabel = '${shop.currency} ${item.lineTotal.toStringAsFixed(0)}';
+      final spaces = (lineWidth - qtyLabel.length - priceLabel.length).clamp(1, lineWidth);
+      if (qtyLabel.length + priceLabel.length + 1 <= lineWidth) {
+        addLine('$qtyLabel${' ' * spaces}$priceLabel');
+      } else {
+        addLine(qtyLabel);
+        addLine('${' ' * (lineWidth - priceLabel.length).clamp(0, lineWidth)}$priceLabel');
+      }
     }
-    bytes += generator.hr();
+    addLine(divider);
 
-    // Financial Totals
-    bytes += generator.row([
-      PosColumn(text: 'Subtotal:', width: 6),
-      PosColumn(text: 'PKR ${sale.subtotal.toInt()}', width: 6, styles: const PosStyles(align: PosAlign.right)),
-    ]);
-    bytes += generator.row([
-      PosColumn(
-        text: 'GRAND TOTAL:',
-        width: 6,
-        styles: const PosStyles(bold: true, height: PosTextSize.size2),
-      ),
-      PosColumn(
-        text: 'PKR ${sale.grandTotal.toInt()}',
-        width: 6,
-        styles: const PosStyles(align: PosAlign.right, bold: true, height: PosTextSize.size2),
-      ),
-    ]);
-    bytes += generator.text('Payment: ${sale.paymentMethod}');
-    bytes += generator.hr();
+    // Totals
+    addLine('Subtotal: ${shop.currency} ${sale.subtotal.toStringAsFixed(0)}');
+    if (sale.discountTotal > 0) {
+      addLine('Discount: -${shop.currency} ${sale.discountTotal.toStringAsFixed(0)}');
+    }
+    if (sale.taxTotal > 0) {
+      addLine('Tax: +${shop.currency} ${sale.taxTotal.toStringAsFixed(0)}');
+    }
+    if (sale.deliveryCharge > 0) {
+      addLine('Delivery: +${shop.currency} ${sale.deliveryCharge.toStringAsFixed(0)}');
+    }
+    bytes.addAll([0x1B, 0x45, 0x01]);
+    addLine('GRAND TOTAL: ${shop.currency} ${sale.grandTotal.toStringAsFixed(0)}');
+    bytes.addAll([0x1B, 0x45, 0x00]);
 
-    // Verification QR Code
-    bytes += generator.qrcode('smartpos://verify?inv=${sale.invoiceNumber}');
-    bytes += generator.text(
-      'Thank you for shopping with us!\nExchange valid within 3 days with receipt.',
-      styles: const PosStyles(align: PosAlign.center),
-    );
+    if (sale.payments.isNotEmpty) {
+      addLine('Payment: ${sale.payments.first.method.name.toUpperCase()}');
+    }
+    addLine(doubleDivider);
 
-    // Feed & Cut Paper
-    bytes += generator.feed(2);
-    bytes += generator.cut();
+    // Center footer
+    bytes.addAll([0x1B, 0x61, 0x01]);
+    addLine(shop.receiptMessage);
+    addLine('*** Powered by Smart POS Pro ***');
+
+    // Feed 3 lines & Partial Cut: GS V 66 0
+    bytes.addAll([0x0A, 0x0A, 0x0A]);
+    bytes.addAll([0x1D, 0x56, 0x42, 0x00]);
 
     return bytes;
+  }
+
+  /// Generates clean formatted text receipt for WhatsApp / Share Sheet.
+  static String formatShareableText({
+    required Sale sale,
+    required Shop shop,
+  }) {
+    final buf = StringBuffer();
+    buf.writeln('*${shop.name.toUpperCase()}*');
+    buf.writeln('${shop.address}, ${shop.city}');
+    buf.writeln('Tel: ${shop.phone}');
+    buf.writeln('--------------------------------');
+    buf.writeln('Invoice: *${sale.invoiceNumber}*');
+    buf.writeln('Date: ${sale.createdAt.length >= 16 ? sale.createdAt.substring(0, 16).replaceAll("T", " ") : sale.createdAt}');
+    buf.writeln('Cashier: ${sale.cashierName}');
+    if (sale.customerName != null) {
+      buf.writeln('Customer: ${sale.customerName}');
+    }
+    buf.writeln('--------------------------------');
+    for (final item in sale.items) {
+      buf.writeln('${item.quantity}x ${item.product.name} — ${shop.currency} ${item.lineTotal.toStringAsFixed(0)}');
+    }
+    buf.writeln('--------------------------------');
+    buf.writeln('Subtotal: ${shop.currency} ${sale.subtotal.toStringAsFixed(0)}');
+    if (sale.discountTotal > 0) {
+      buf.writeln('Discount: -${shop.currency} ${sale.discountTotal.toStringAsFixed(0)}');
+    }
+    if (sale.taxTotal > 0) {
+      buf.writeln('Tax: +${shop.currency} ${sale.taxTotal.toStringAsFixed(0)}');
+    }
+    if (sale.deliveryCharge > 0) {
+      buf.writeln('Delivery: +${shop.currency} ${sale.deliveryCharge.toStringAsFixed(0)}');
+    }
+    buf.writeln('*GRAND TOTAL: ${shop.currency} ${sale.grandTotal.toStringAsFixed(0)}*');
+    if (sale.payments.isNotEmpty) {
+      buf.writeln('Paid via: ${sale.payments.first.method.name.toUpperCase()}');
+    }
+    buf.writeln('--------------------------------');
+    buf.writeln(shop.receiptMessage);
+    return buf.toString();
   }
 }

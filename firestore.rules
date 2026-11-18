@@ -7,50 +7,83 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    function incoming() {
-      return request.resource.data;
+    // Connection validation document
+    match /test/{docId} {
+      allow read, write: if isValidId(docId);
     }
 
-    function existing() {
-      return resource.data;
+    // Cross-platform SaaS User Profiles (Owners, Managers, Cashiers)
+    match /saas_users/{userId} {
+      allow list: if true;
+      allow get: if isValidId(userId);
+      allow create, update: if isValidId(userId)
+        && request.resource.data.keys().hasAll(['id', 'name', 'email', 'role'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 150
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 100;
+      allow delete: if isValidId(userId);
     }
 
-    // Shop configuration documents
+    // Cross-platform Monthly Subscription Requests (Super Admin Queue)
+    match /subscription_requests/{requestId} {
+      allow list: if true;
+      allow get: if isValidId(requestId);
+      allow create, update: if isValidId(requestId)
+        && request.resource.data.keys().hasAll(['id', 'shopId', 'shopName', 'status'])
+        && request.resource.data.shopName is string
+        && request.resource.data.shopName.size() <= 150;
+      allow delete: if isValidId(requestId);
+    }
+
+    // Multi-tenant Shop configuration documents & operational subcollections
     match /shops/{shopId} {
-      allow read: if true; // Publicly readable for store identity lookup
-      allow create, update: if isSignedIn() || true; // Demo mode allows initialization
-      allow delete: if isSignedIn();
+      allow list: if true;
+      allow get: if isValidId(shopId);
+      allow create, update: if isValidId(shopId)
+        && request.resource.data.keys().hasAll(['id', 'name'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 150;
+      allow delete: if isValidId(shopId);
 
       // Products subcollection
       match /products/{productId} {
-        allow read: if true;
-        allow create, update, delete: if true; // Demo mode cloud persistence
+        allow list: if true;
+        allow get, create, update, delete: if isValidId(shopId) && isValidId(productId);
       }
 
       // Sales subcollection
       match /sales/{saleId} {
-        allow read: if true;
-        allow create, update: if true;
+        allow list: if true;
+        allow get, create, update, delete: if isValidId(shopId) && isValidId(saleId);
       }
 
-      // Customers subcollection
+      // Customers & Khata subcollection
       match /customers/{customerId} {
-        allow read: if true;
-        allow create, update: if true;
+        allow list: if true;
+        allow get, create, update, delete: if isValidId(shopId) && isValidId(customerId);
+      }
+
+      // Suppliers & Payables subcollection
+      match /suppliers/{supplierId} {
+        allow list: if true;
+        allow get, create, update, delete: if isValidId(shopId) && isValidId(supplierId);
+      }
+
+      // Operating Expenses subcollection
+      match /expenses/{expenseId} {
+        allow list: if true;
+        allow get, create, update, delete: if isValidId(shopId) && isValidId(expenseId);
       }
 
       // Inventory transactions subcollection
       match /inventory_transactions/{transactionId} {
-        allow read: if true;
-        allow create: if true;
+        allow list: if true;
+        allow get, create, update, delete: if isValidId(shopId) && isValidId(transactionId);
       }
     }
   }

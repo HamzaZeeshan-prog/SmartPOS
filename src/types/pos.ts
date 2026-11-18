@@ -1,4 +1,30 @@
-export type UserRole = 'owner' | 'manager' | 'cashier';
+export type UserRole = 'super_admin' | 'owner' | 'manager' | 'cashier';
+
+export type SubscriptionStatus =
+  | 'pending_approval'
+  | 'active'
+  | 'expired'
+  | 'rejected'
+  | 'blocked';
+
+export interface SubscriptionRequest {
+  id: string;
+  shopId: string;
+  shopName: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone?: string;
+  planId: string;
+  planName: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentReference: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+}
 
 export interface User {
   id: string;
@@ -6,24 +32,44 @@ export interface User {
   email: string;
   role: UserRole;
   phone: string;
+  password?: string;
+  shopId?: string;
+  businessIds?: string[];
+  subscriptionPlan?: string;
   avatarUrl?: string;
+  createdAt?: string;
 }
 
 export interface Shop {
   id: string;
   name: string;
   ownerName: string;
+  ownerId?: string;
+  ownerEmail?: string;
   phone: string;
   category: string;
   address: string;
   city: string;
-  currency: string; // 'PKR'
+  currency: string; // 'PKR', 'USD', etc.
   taxEnabled: boolean;
   defaultTaxRate: number; // e.g. 5%
+  discountEnabled?: boolean;
+  defaultDiscountRate?: number; // e.g. 5% optional default bill discount
   receiptMessage: string;
   logoUrl?: string;
   allowNegativeStock: boolean;
   thermalPrinterWidth: '58mm' | '80mm';
+  subscriptionStatus?: SubscriptionStatus;
+  subscriptionPlanId?: string;
+  subscriptionPlanName?: string;
+  subscriptionFee?: number;
+  subscriptionPaymentMethod?: string;
+  subscriptionPaymentRef?: string;
+  subscriptionStartDate?: string;
+  subscriptionExpiresAt?: string;
+  subscriptionRejectionReason?: string;
+  subscriptionRequests?: SubscriptionRequest[];
+  createdAt?: string;
 }
 
 export interface ProductVariant {
@@ -58,7 +104,7 @@ export interface Product {
   expiryDate?: string;
   variants?: ProductVariant[];
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface CartItem {
@@ -232,4 +278,3 @@ export interface ZReportData {
   actualCountedCash?: number;
   cashDifference?: number;
 }
-

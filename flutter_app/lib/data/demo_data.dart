@@ -1,44 +1,118 @@
-import 'models/models.dart';
+import '../models/models.dart';
+import 'saas_config.dart';
 
 class DemoData {
   static List<User> get users => [
-        User(id: 'usr_owner_1', name: 'Tariq Mehmood', email: 'tariq@citymart.pk', role: UserRole.owner, phone: '+92 300 1234567'),
-        User(id: 'usr_manager_1', name: 'Bilal Khan', email: 'bilal.manager@citymart.pk', role: UserRole.manager, phone: '+92 321 7654321'),
-        User(id: 'usr_cashier_1', name: 'Hamza Farooq', email: 'hamza.cashier@citymart.pk', role: UserRole.cashier, phone: '+92 333 9876543'),
+        const User(
+          id: 'usr_owner_1',
+          name: 'Tariq Mehmood',
+          email: 'tariq@citymart.pk',
+          role: UserRole.owner,
+          phone: '+92 300 1234567',
+          password: 'password123',
+          shopId: 'shop_001',
+          businessIds: ['shop_001', 'shop_002'],
+          subscriptionPlan: 'Business Pro Monthly',
+          createdAt: '2026-08-01T00:00:00Z',
+        ),
+        const User(
+          id: 'usr_owner_2',
+          name: 'Dr. Ayesha Noor',
+          email: 'ayesha@medcare.pk',
+          role: UserRole.owner,
+          phone: '+92 312 9988776',
+          password: 'password123',
+          shopId: 'shop_003',
+          businessIds: ['shop_003'],
+          subscriptionPlan: 'Starter Monthly',
+          createdAt: '2026-10-01T00:00:00Z',
+        ),
       ];
 
-  static List<Shop> get shops => [
-        Shop(
-          id: 'shop_001',
-          name: 'City Mart - Main Branch',
-          ownerName: 'Tariq Mehmood',
-          phone: '+92 51 2891234',
-          category: 'Grocery & Supermarket',
-          address: 'Shop 14-16, F-7 Markaz, Jinnah Super',
-          city: 'Islamabad',
-          currency: 'PKR',
-          taxEnabled: true,
-          defaultTaxRate: 5,
-          receiptMessage: 'Thank you for shopping at City Mart! Exchange within 3 days with receipt.',
-          allowNegativeStock: false,
-          thermalPrinterWidth: PrinterWidth.mm80,
-        ),
-        Shop(
-          id: 'shop_002',
-          name: 'City Mart - Express Express',
-          ownerName: 'Tariq Mehmood',
-          phone: '+92 51 5789012',
-          category: 'Convenience Store',
-          address: 'Sector B Commercial, DHA Phase 2',
-          city: 'Islamabad',
-          currency: 'PKR',
-          taxEnabled: false,
-          defaultTaxRate: 0,
-          receiptMessage: 'Fast & Fresh! Visit us again soon.',
-          allowNegativeStock: false,
-          thermalPrinterWidth: PrinterWidth.mm58,
-        ),
-      ];
+  static List<Shop> get shops {
+    final nowIso = DateTime.now().toIso8601String();
+    final nextMonthIso = SaasConfig.addDaysIso(30);
+    return [
+      Shop(
+        id: 'shop_001',
+        name: 'City Mart - Main Branch',
+        ownerName: 'Tariq Mehmood',
+        ownerId: 'usr_owner_1',
+        ownerEmail: 'tariq@citymart.pk',
+        phone: '+92 51 2891234',
+        category: 'Grocery & Supermarket',
+        address: 'Shop 14-16, F-7 Markaz, Jinnah Super',
+        city: 'Islamabad',
+        currency: 'PKR',
+        taxEnabled: true,
+        defaultTaxRate: 5,
+        receiptMessage: 'Thank you for shopping at City Mart! Exchange within 3 days with receipt.',
+        allowNegativeStock: false,
+        thermalPrinterWidth: PrinterWidth.mm80,
+        subscriptionStatus: SubscriptionStatus.active,
+        subscriptionPlanId: 'pro_monthly',
+        subscriptionPlanName: 'Business Pro Monthly',
+        subscriptionFee: 4900,
+        subscriptionPaymentMethod: 'JazzCash',
+        subscriptionPaymentRef: 'JC-881029',
+        subscriptionStartedAt: nowIso,
+        subscriptionExpiresAt: nextMonthIso,
+        createdAt: '2026-08-01T00:00:00Z',
+      ),
+      Shop(
+        id: 'shop_002',
+        name: 'City Mart - Mianwali Branch',
+        ownerName: 'Tariq Mehmood',
+        ownerId: 'usr_owner_1',
+        ownerEmail: 'tariq@citymart.pk',
+        phone: '+92 459 231456',
+        category: 'Convenience Store',
+        address: 'Main PAF Road, Commercial Market',
+        city: 'Mianwali',
+        currency: 'PKR',
+        taxEnabled: false,
+        defaultTaxRate: 0,
+        receiptMessage: 'Fast & Fresh in Mianwali! Visit us again soon.',
+        allowNegativeStock: false,
+        thermalPrinterWidth: PrinterWidth.mm58,
+        subscriptionStatus: SubscriptionStatus.active,
+        subscriptionPlanId: 'pro_monthly',
+        subscriptionPlanName: 'Business Pro Monthly',
+        subscriptionFee: 4900,
+        subscriptionPaymentMethod: 'JazzCash',
+        subscriptionPaymentRef: 'JC-881030',
+        subscriptionStartedAt: nowIso,
+        subscriptionExpiresAt: nextMonthIso,
+        createdAt: '2026-09-15T00:00:00Z',
+      ),
+      Shop(
+        id: 'shop_003',
+        name: 'MedCare 24/7 Pharmacy',
+        ownerName: 'Dr. Ayesha Noor',
+        ownerId: 'usr_owner_2',
+        ownerEmail: 'ayesha@medcare.pk',
+        phone: '+92 42 35789012',
+        category: 'Pharmacy & Healthcare',
+        address: 'Commercial Zone, Gulberg III',
+        city: 'Lahore',
+        currency: 'PKR',
+        taxEnabled: false,
+        defaultTaxRate: 0,
+        receiptMessage: 'Your Health, Our Priority. Fast prescription delivery.',
+        allowNegativeStock: false,
+        thermalPrinterWidth: PrinterWidth.mm80,
+        subscriptionStatus: SubscriptionStatus.active,
+        subscriptionPlanId: 'starter_monthly',
+        subscriptionPlanName: 'Starter Monthly',
+        subscriptionFee: 2500,
+        subscriptionPaymentMethod: 'Easypaisa',
+        subscriptionPaymentRef: 'EP-559102',
+        subscriptionStartedAt: nowIso,
+        subscriptionExpiresAt: nextMonthIso,
+        createdAt: '2026-10-01T00:00:00Z',
+      ),
+    ];
+  }
 
   static List<Supplier> get suppliers => [
         Supplier(
@@ -105,6 +179,17 @@ class DemoData {
     Product(id: 'prod_018', shopId: 'shop_001', barcode: '896400016002', qrCode: 'CM-PC-002', name: 'Sunsilk Black Shine Shampoo 380ml', category: 'Personal Care', brand: 'Unilever', description: 'Enriched with Amla pearl complex for long, lustrous black hair.', costPrice: 590, sellingPrice: 710, taxPercentage: 5, stockQuantity: 19, minimumStockLimit: 8, unit: ProductUnit.piece, supplierId: 'sup_001', supplierName: 'National Wholesale Distributors', createdAt: '2026-09-09T09:00:00Z', updatedAt: '2026-10-21T18:00:00Z'),
     Product(id: 'prod_019', shopId: 'shop_001', barcode: '896400016003', qrCode: 'CM-PC-003', name: 'Colgate Maximum Cavity Protection 150g', category: 'Personal Care', brand: 'Colgate', description: 'Calcium and active fluoride formula strengthens enamel.', costPrice: 220, sellingPrice: 270, taxPercentage: 5, stockQuantity: 41, minimumStockLimit: 12, unit: ProductUnit.piece, supplierId: 'sup_001', supplierName: 'National Wholesale Distributors', createdAt: '2026-09-10T10:00:00Z', updatedAt: '2026-10-23T11:00:00Z'),
     Product(id: 'prod_020', shopId: 'shop_001', barcode: '896400016004', qrCode: 'CM-PC-004', name: 'Surf Excel Quick Wash Detergent 1kg', category: 'Personal Care', brand: 'Unilever', description: 'Superior stain removal technology in 1 easy wash step.', costPrice: 470, sellingPrice: 560, taxPercentage: 5, stockQuantity: 35, minimumStockLimit: 10, unit: ProductUnit.packet, supplierId: 'sup_001', supplierName: 'National Wholesale Distributors', createdAt: '2026-09-10T10:00:00Z', updatedAt: '2026-10-22T16:30:00Z'),
+    // Shop 002 (Express Branch) products
+    Product(id: 'prod_201', shopId: 'shop_002', barcode: '896400021001', name: 'Nestle Pure Life Water 1.5L', category: 'Beverages', brand: 'Nestle', costPrice: 70, sellingPrice: 100, taxPercentage: 0, stockQuantity: 90, minimumStockLimit: 20, unit: ProductUnit.piece, createdAt: '2026-10-01T09:00:00Z'),
+    Product(id: 'prod_202', shopId: 'shop_002', barcode: '896400021002', name: 'Sting Berry Energy Drink 500ml', category: 'Beverages', brand: 'PepsiCo', costPrice: 110, sellingPrice: 150, taxPercentage: 5, stockQuantity: 45, minimumStockLimit: 12, unit: ProductUnit.piece, createdAt: '2026-10-01T09:00:00Z'),
+    Product(id: 'prod_203', shopId: 'shop_002', barcode: '896400021003', name: 'Dawn Chicken Sandwich Bread', category: 'Bakery', brand: 'Dawn', costPrice: 140, sellingPrice: 175, taxPercentage: 0, stockQuantity: 18, minimumStockLimit: 6, unit: ProductUnit.packet, createdAt: '2026-10-01T09:00:00Z'),
+    Product(id: 'prod_204', shopId: 'shop_002', barcode: '896400021004', name: 'K&Ns Nuggets 500g Pack', category: 'Frozen', brand: 'K&Ns', costPrice: 680, sellingPrice: 820, taxPercentage: 0, stockQuantity: 6, minimumStockLimit: 8, unit: ProductUnit.packet, createdAt: '2026-10-01T09:00:00Z'),
+    // Shop 003 (MedCare Pharmacy) products
+    Product(id: 'prod_301', shopId: 'shop_003', barcode: '896400031001', name: 'Panadol Extra 500mg Tablets 100s', category: 'Analgesics', brand: 'GSK', costPrice: 320, sellingPrice: 380, taxPercentage: 0, stockQuantity: 55, minimumStockLimit: 15, unit: ProductUnit.box, createdAt: '2026-10-05T09:00:00Z'),
+    Product(id: 'prod_302', shopId: 'shop_003', barcode: '896400031002', name: 'Augmentin 625mg Tablets 14s', category: 'Antibiotics', brand: 'GSK', costPrice: 520, sellingPrice: 610, taxPercentage: 0, stockQuantity: 32, minimumStockLimit: 10, unit: ProductUnit.packet, createdAt: '2026-10-05T09:00:00Z'),
+    Product(id: 'prod_303', shopId: 'shop_003', barcode: '896400031003', name: 'Brufen 400mg Suspension 120ml', category: 'Anti-inflammatory', brand: 'Abbott', costPrice: 110, sellingPrice: 140, taxPercentage: 0, stockQuantity: 40, minimumStockLimit: 10, unit: ProductUnit.piece, createdAt: '2026-10-05T09:00:00Z'),
+    Product(id: 'prod_304', shopId: 'shop_003', barcode: '896400031004', name: 'Dettol Antiseptic Liquid 250ml', category: 'Antiseptics', brand: 'Reckitt', costPrice: 390, sellingPrice: 460, taxPercentage: 5, stockQuantity: 18, minimumStockLimit: 6, unit: ProductUnit.piece, createdAt: '2026-10-05T09:00:00Z'),
+    Product(id: 'prod_305', shopId: 'shop_003', barcode: '896400031005', name: 'Omron Digital Thermometer', category: 'Medical Devices', brand: 'Omron', costPrice: 550, sellingPrice: 780, taxPercentage: 5, stockQuantity: 4, minimumStockLimit: 8, unit: ProductUnit.piece, createdAt: '2026-10-05T09:00:00Z'),
   ];
 
   static List<Sale> get pastSales {
@@ -145,6 +230,28 @@ class DemoData {
         payments: [PaymentRecord(id: 'pay_301', method: PaymentMethod.easypaisa, amount: 441, status: PaymentStatus.paid, provider: 'Easypaisa QR Gateway', referenceNumber: 'EP-55102918')],
         paymentStatus: PaymentStatus.paid, createdAt: '2026-10-24T09:12:00Z',
       ),
+      Sale(
+        id: 'sale_2001', invoiceNumber: 'INV-EXP-001', shopId: 'shop_002',
+        cashierId: 'usr_owner_1', cashierName: 'Tariq Mehmood',
+        items: [
+          CartItem(id: 'item_2001', product: p[20], quantity: 4, unitPrice: 100),
+          CartItem(id: 'item_2002', product: p[23], quantity: 1, unitPrice: 820),
+        ],
+        subtotal: 1220, discountTotal: 0, taxTotal: 0, deliveryCharge: 0, grandTotal: 1220,
+        payments: [PaymentRecord(id: 'pay_2001', method: PaymentMethod.cash, amount: 1220, cashReceived: 1500, changeReturned: 280)],
+        paymentStatus: PaymentStatus.paid, createdAt: '2026-10-24T10:00:00Z',
+      ),
+      Sale(
+        id: 'sale_3001', invoiceNumber: 'INV-MED-001', shopId: 'shop_003',
+        cashierId: 'usr_owner_2', cashierName: 'Dr. Ayesha Noor',
+        items: [
+          CartItem(id: 'item_3001', product: p[24], quantity: 2, unitPrice: 380),
+          CartItem(id: 'item_3002', product: p[25], quantity: 1, unitPrice: 610),
+        ],
+        subtotal: 1370, discountTotal: 0, taxTotal: 0, deliveryCharge: 0, grandTotal: 1370,
+        payments: [PaymentRecord(id: 'pay_3001', method: PaymentMethod.bankQr, amount: 1370, provider: 'Raast QR', referenceNumber: 'RS-7731209')],
+        paymentStatus: PaymentStatus.paid, createdAt: '2026-10-24T11:20:00Z',
+      ),
     ];
   }
 
@@ -153,5 +260,6 @@ class DemoData {
         Expense(id: 'exp_002', shopId: 'shop_001', amount: 3500, date: '2026-10-22T14:15:00Z', category: ExpenseCategory.Internet, description: 'Nayatel optical fiber high-speed internet & static IP', createdBy: 'Bilal Khan'),
         Expense(id: 'exp_003', shopId: 'shop_001', amount: 8500, date: '2026-10-23T16:30:00Z', category: ExpenseCategory.Transport, description: 'Bulk delivery van fuel and Sabzi Mandi pickup charges', createdBy: 'Hamza Farooq'),
         Expense(id: 'exp_004', shopId: 'shop_001', amount: 4200, date: '2026-10-24T11:00:00Z', category: ExpenseCategory.Miscellaneous, description: 'Thermal receipt paper rolls (80mm x 50 rolls) and packaging shopping bags', createdBy: 'Bilal Khan'),
+        Expense(id: 'exp_301', shopId: 'shop_003', amount: 12000, date: '2026-10-22T12:00:00Z', category: ExpenseCategory.Utilities, description: 'Cold chain refrigeration backup & clinic utilities', createdBy: 'Dr. Ayesha Noor'),
       ];
 }
